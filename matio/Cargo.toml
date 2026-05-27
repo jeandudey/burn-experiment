@@ -1,0 +1,9 @@
+[package]
+name = "matio"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+matio-sys.workspace = true
+thiserror = "2.0.18"
+tracing = "0.1.44"
