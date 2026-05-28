@@ -1,5 +1,5 @@
 [package]
-name = "burn-300w-lp"
+name = "burn-3ddfa"
 version = "0.1.0"
 edition = "2024"
 
@@ -8,5 +8,6 @@ burn = { version = "0.21.0", features = ["dataset", "vision"] }
 image = "0.25.10"
 matio.workspace = true
 thiserror = "2.0.18"
+tokio = "1.52.3"
 tracing = "0.1.44"
 walkdir = "2.5.0"

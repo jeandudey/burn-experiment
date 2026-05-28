@@ -528,13 +528,14 @@ dependencies = [
 ]
 
 [[package]]
-name = "burn-300w-lp"
+name = "burn-3ddfa"
 version = "0.1.0"
 dependencies = [
  "burn",
  "image",
  "matio",
  "thiserror 2.0.18",
+ "tokio",
  "tracing",
  "walkdir",
 ]
@@ -789,9 +790,11 @@ name = "burn-experiments"
 version = "0.1.0"
 dependencies = [
  "burn",
- "burn-300w-lp",
+ "burn-3ddfa",
  "image",
+ "mobilenetv2-burn",
  "resnet-burn",
+ "tokio",
 ]
 
 [[package]]
@@ -1463,6 +1466,13 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "633458d4ef8c78b72454de2d54fd6ab2e60f9e02be22f3c6104cdc8a4e0fceb9"
 dependencies = [
  "unicode-segmentation",
+]
+
+[[package]]
+name = "convnext-burn"
+version = "0.1.0"
+dependencies = [
+ "burn",
 ]
 
 [[package]]
@@ -4198,6 +4208,15 @@ dependencies = [
  "log",
  "wasi",
  "windows-sys 0.61.2",
+]
+
+[[package]]
+name = "mobilenetv2-burn"
+version = "0.1.0"
+source = "git+https://github.com/tracel-ai/models#ec1b9e42e6692ef2b95f85c4ba783e07cd3d19af"
+dependencies = [
+ "burn",
+ "serde",
 ]
 
 [[package]]

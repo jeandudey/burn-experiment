@@ -184,6 +184,13 @@ impl<'a> Value<'a> {
             _ => None,
         }
     }
+
+    pub fn as_double(&self) -> Option<&[f64]> {
+        match self {
+            Value::Double(v) => Some(v),
+            _ => None,
+        }
+    }
 }
 
 /// File access mode.
