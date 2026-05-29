@@ -20,9 +20,12 @@ edition = "2024"
 burn-3ddfa.workspace = true
 resnet-burn.workspace = true
 mobilenetv2-burn.workspace = true
-burn = { version = "0.21.0", features = ["autotune", "autodiff", "fusion", "rocm", "train", "vision"] }
+burn = { version = "0.21.0", features = ["autotune", "autodiff", "fusion", "rocm", "train", "vision", "wgpu"] }
 image = "0.25.10"
 tokio = "1.52.3"
+eyre = "0.6.12"
+clap = "4.6.1"
 
 [profile.release]
 debug = true
+strip = false

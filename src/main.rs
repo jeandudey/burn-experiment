@@ -1,11 +1,10 @@
 use burn::backend::rocm::RocmDevice;
-use burn::backend::{Autodiff, Rocm};
+use burn::backend::wgpu::WgpuDevice;
+use burn::backend::{Autodiff, Rocm, Wgpu};
 use burn::data::dataloader::DataLoaderBuilder;
 use burn::data::dataloader::batcher::Batcher;
 use burn::data::dataset::Dataset;
-use burn::data::dataset::transform::{
-    Mapper, MapperDataset, PartialDataset, RngSource, ShuffledDataset,
-};
+use burn::data::dataset::transform::{Mapper, MapperDataset, RngSource, ShuffledDataset};
 use burn::nn::loss::{MseLoss, Reduction};
 use burn::optim::AdamConfig;
 use burn::prelude::*;
@@ -16,10 +15,16 @@ use burn::train::{
     InferenceStep, Learner, RegressionOutput, SupervisedTraining, TrainOutput, TrainStep,
 };
 use burn_3ddfa::{Pose, PoseDataset, PoseDatasetItem};
+use eyre::{Result, WrapErr};
+use mobilenetv2_burn::model::imagenet::Normalizer;
 use resnet_burn::ResNet;
 use resnet_burn::weights::ResNet50;
-use mobilenetv2_burn::model::imagenet::Normalizer;
-use std::sync::Arc;
+
+type TrainingDataset<D> = MapperDataset<D, ToTrainingDataItem, PoseDatasetItem>;
+
+fn to_training_dataset<D>(dataset: D) -> TrainingDataset<D> {
+    MapperDataset::new(dataset, ToTrainingDataItem)
+}
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct TrainingDataItem {
@@ -59,7 +64,8 @@ impl Mapper<PoseDatasetItem, TrainingDataItem> for ToTrainingDataItem {
 
         let rgb32f = image.clone().into_rgb32f();
         let cropped = image::imageops::crop_imm(&rgb32f, x0, y0, x1 - x0, y1 - y0).to_image();
-        let resized = image::imageops::resize(&cropped, 256, 256, image::imageops::FilterType::Nearest);
+        let resized =
+            image::imageops::resize(&cropped, 256, 256, image::imageops::FilterType::Nearest);
         let center = image::imageops::crop_imm(&resized, 16, 16, 224, 224).to_image();
 
         // Convert HWC → CHW so the batcher can upload the whole batch in one from_data call.
@@ -135,10 +141,7 @@ impl<B: Backend> Batcher<B, TrainingDataItem, PoseBatch<B>> for PoseBatcher<B> {
                 TensorData::new(pixels, [n, 3, 224, 224]),
                 device,
             )),
-            targets: Tensor::<B, 2>::from_data(
-                TensorData::new(targets, [n, 3]),
-                device,
-            ),
+            targets: Tensor::<B, 2>::from_data(TensorData::new(targets, [n, 3]), device),
         }
     }
 }
@@ -172,10 +175,10 @@ impl<B: AutodiffBackend> TrainStep for PoseModel<B> {
     type Output = RegressionOutput<B>;
 
     fn step(&self, batch: PoseBatch<B>) -> TrainOutput<RegressionOutput<B>> {
-        let t = std::time::Instant::now();
+        //let t = std::time::Instant::now();
         let item = self.forward_step(batch);
         let grads = item.loss.backward();
-        eprintln!("step: {:?}", t.elapsed());
+        //eprintln!("step: {:?}", t.elapsed());
         TrainOutput::new(self, grads, item)
     }
 }
@@ -209,7 +212,7 @@ pub fn train<B: AutodiffBackend>(
     device: B::Device,
     train_ds: impl Dataset<TrainingDataItem> + 'static,
     valid_ds: impl Dataset<TrainingDataItem> + 'static,
-) {
+) -> Result<()> {
     let config = TrainingConfig::new(AdamConfig::new());
     B::seed(&device, config.seed);
 
@@ -242,20 +245,29 @@ pub fn train<B: AutodiffBackend>(
     result
         .model
         .save_file(format!("{artifact_dir}/model"), &CompactRecorder::new())
-        .expect("failed to save trained model");
+        .wrap_err("failed to save trained model")?;
+    Ok(())
 }
 
-fn main() {
-    let dataset = MapperDataset::new(
-        PoseDataset::new("datasets/300W_LP").unwrap(),
-        ToTrainingDataItem,
-    );
-    let shuffled_dataset = Arc::new(ShuffledDataset::new(dataset, RngSource::Default));
-    let cut = shuffled_dataset.len() * 9 / 10;
-    let train_dataset = PartialDataset::new(shuffled_dataset.clone(), 0, cut);
-    let valid_dataset = PartialDataset::new(shuffled_dataset.clone(), cut, shuffled_dataset.len());
+fn main() -> Result<()> {
+    let train_dataset =
+        PoseDataset::download_300w_lp().wrap_err("failed to download 300W-LP dataset")?;
+    let train_dataset = to_training_dataset(train_dataset);
+    let train_dataset = ShuffledDataset::new(train_dataset, RngSource::Default);
 
-    type RocmBackend = Autodiff<Rocm>;
-    let device = RocmDevice::default();
-    train::<RocmBackend>("./artifacts", device, train_dataset, valid_dataset);
+    let valid_dataset =
+        PoseDataset::download_aflw2000_3d().wrap_err("failed to download AFLW2000-3D dataset")?;
+    let valid_dataset = to_training_dataset(valid_dataset);
+    let valid_dataset = ShuffledDataset::new(valid_dataset, RngSource::Default);
+
+    if true {
+        type RocmBackend = Autodiff<Rocm>;
+        let device = RocmDevice::default();
+        train::<RocmBackend>("./artifacts", device, train_dataset, valid_dataset)?;
+    } else {
+        type WgpuBackend = Autodiff<Wgpu>;
+        let device = WgpuDevice::default();
+        train::<WgpuBackend>("./artifacts", device, train_dataset, valid_dataset)?;
+    }
+    Ok(())
 }

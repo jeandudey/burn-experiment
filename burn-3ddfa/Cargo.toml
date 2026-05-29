@@ -5,9 +5,14 @@ edition = "2024"
 
 [dependencies]
 burn = { version = "0.21.0", features = ["dataset", "vision"] }
+dirs = "6.0.0"
 image = "0.25.10"
+indicatif = "0.18.4"
 matio.workspace = true
+reqwest = { version = "0.13.4", features = ["cookies", "query"] }
+scraper = "0.27.0"
 thiserror = "2.0.18"
-tokio = "1.52.3"
+tokio = { version = "1.52.3", features = ["fs"] }
 tracing = "0.1.44"
 walkdir = "2.5.0"
+zip = "8.6.0"
