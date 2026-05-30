@@ -1,0 +1,33 @@
+name: insightface
+base: ubuntu@24.04
+sdks:
+  - name: uv
+    channel: latest/stable
+actions:
+  clean: |
+    rm -rf ~/.venv ~/.gdown-venv
+  scrfd2onnx: |
+    sudo apt-get update
+    sudo apt-get install -y libgl1 libglib2.0-0
+
+    uv venv ~/.gdown-venv --allow-existing
+    source ~/.gdown-venv/bin/activate
+    command -v gdown >/dev/null 2>&1 || uv pip install gdown
+    [ -f ~/SCRFD_500M.pth ] || gdown 'https://drive.google.com/file/d/1OX0i_vWDp1Fp-ZynOUMZo-q1vB5g1pTN/view?usp=sharing' -O ~/SCRFD_500M.pth
+    deactivate
+
+    uv venv --python 3.8 ~/.venv --allow-existing
+    source ~/.venv/bin/activate
+    [ -d ~/insightface ] || git clone https://github.com/deepinsight/insightface.git ~/insightface
+    cd ~/insightface/detection/scrfd
+    uv pip install torch==1.8.1 torchvision==0.9.1
+    uv pip install mmcv-full==1.3.3 \
+      --find-links https://download.openmmlab.com/mmcv/dist/cpu/torch1.8.0/index.html
+    uv pip install onnx==1.9.0 onnxruntime==1.8.0 onnx-simplifier==0.3.6 numpy==1.23.5 Pillow terminaltables pycocotools
+    uv pip install -r requirements/build.txt
+    sed -i '/autotorch/d' requirements/*.txt requirements.txt 2>/dev/null || true
+    uv pip install setuptools scipy==1.10.1 tqdm
+    uv pip install -v -e . --no-deps --no-build-isolation
+    PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python python3 tools/scrfd2onnx.py ./configs/scrfd/scrfd_500m.py ~/SCRFD_500M.pth
+    mkdir -p /project/scrfd-burn/model
+    cp onnx/scrfd_500m.onnx /project/scrfd-burn/model
