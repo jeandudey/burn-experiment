@@ -11,6 +11,7 @@ use crate::weights;
 #[cfg(feature = "pretrained")]
 use burn_store::{ModuleSnapshot, PytorchStore, PytorchStoreError};
 
+/// 6DRepNet360 model.
 #[derive(Debug, Module)]
 pub struct SixDRepNet360<B: Backend> {
     conv1: Conv2d<B>,
@@ -33,6 +34,7 @@ impl<B: Backend> SixDRepNet360<B> {
 
 #[cfg(feature = "pretrained")]
 impl<B: Backend> SixDRepNet360<B> {
+    /// Download a pretrained 6DRepNet360 model from a PyTorch weights file.
     #[cfg(feature = "pretrained")]
     pub fn pretrained(device: &B::Device) -> Result<Self, PytorchStoreError> {
         let mut model = Self::new([3, 4, 6, 3], device);
@@ -40,27 +42,37 @@ impl<B: Backend> SixDRepNet360<B> {
         Ok(model)
     }
 
+    /// Download the pretrained weights for the model.
     pub fn download_weights(model: &mut Self) -> Result<(), PytorchStoreError> {
         let torch_weights = weights::download().map_err(|err| {
             PytorchStoreError::Other(format!("Could not download weights.\nError: {err}"))
         })?;
 
-        let mut store = PytorchStore::from_file(torch_weights);
+        let mut store = PytorchStore::from_file(torch_weights)
+            // Map *.downsample.0.* -> *.downsample.conv.*
+            .with_key_remapping("(.+)\\.downsample\\.0\\.(.+)", "$1.downsample.conv.$2")
+            // Map *.downsample.1.* -> *.downsample.bn.*
+            .with_key_remapping("(.+)\\.downsample\\.1\\.(.+)", "$1.downsample.bn.$2")
+            // Map layer[i].[j].* -> layer[i].blocks.[j].*
+            .with_key_remapping("(layer[1-4])\\.([0-9]+)\\.(.+)", "$1.blocks.$2.$3");
         model.load_from(&mut store)?;
         Ok(())
     }
 }
 
+/// Configuration for the 6DRepNet360 model.
 #[derive(Debug)]
 pub struct SixDRepNet360Config {
     pub layers: [usize; 4],
 }
 
 impl SixDRepNet360Config {
+    /// Create a new configuration with the given layer sizes.
     pub fn new(layers: [usize; 4]) -> Self {
         Self { layers }
     }
 
+    /// Initialize the model with the given device.
     pub fn init<B: Backend>(&self, device: &B::Device) -> SixDRepNet360<B> {
         const EXPANSION: usize = 4;
 
@@ -96,7 +108,7 @@ impl SixDRepNet360Config {
             )
             .init(device),
             avgpool: AvgPool2dConfig::new([7, 7]).init(),
-            linear_reg: LinearConfig::new(0, 0).init(device),
+            linear_reg: LinearConfig::new(512 * EXPANSION, 6).init(device),
         }
     }
 }
