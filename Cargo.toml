@@ -1,5 +1,11 @@
 [workspace]
-members = ["burn-3ddfa", "convnext-burn", "matio", "matio-sys"]
+members = [
+    "burn-3ddfa",
+    "convnext-burn",
+    "matio",
+    "matio-sys",
+    "sixdrepnet360-burn",
+]
 
 [workspace.dependencies]
 burn = "0.21.0"
@@ -25,6 +31,9 @@ image = "0.25.10"
 tokio = "1.52.3"
 eyre = "0.6.12"
 clap = "4.6.1"
+
+[patch.crates-io]
+cubecl-hip-sys.path = "../cubecl-hip-sys/crates/cubecl-hip-sys"
 
 [profile.release]
 debug = true
